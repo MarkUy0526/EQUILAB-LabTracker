@@ -1,1 +1,402 @@
 
+-- Run this SQL once in your database (labtracker)
+-- Creates the equipment_log table for tracking added equipment
+
+CREATE TABLE IF NOT EXISTS `equipment_log` (
+  `id`             INT(11)      NOT NULL AUTO_INCREMENT,
+  `equipment_id`   VARCHAR(50)  NOT NULL,
+  `equipment_name` VARCHAR(255) NOT NULL,
+  `total_qty`      INT(11)      NOT NULL DEFAULT 0,
+  `working_qty`    INT(11)      NOT NULL DEFAULT 0,
+  `not_working_qty`INT(11)      NOT NULL DEFAULT 0,
+  `account_person` VARCHAR(255) NOT NULL DEFAULT '',
+  `action`         VARCHAR(50)  NOT NULL DEFAULT 'Added',
+  `added_by`       VARCHAR(255) NOT NULL DEFAULT 'Admin',
+  `added_at_ph`    DATETIME     NOT NULL COMMENT 'PH time (Asia/Manila)',
+  PRIMARY KEY (`id`),
+  KEY `idx_equipment_id` (`equipment_id`),
+  KEY `idx_added_at`     (`added_at_ph`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ════════════════════════════════════════════════════════════════
+-- EQUILAB — Equipment History Log
+-- HOW TO RUN:
+--   1. Open phpMyAdmin
+--   2. Select the "labtracker" database
+--   3. Click the SQL tab
+--   4. Paste this entire file and click Go
+--   5. Run it only once — IF NOT EXISTS makes it safe to re-run
+-- ════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS `equipment_history` (
+    `id`            INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+    `equipment_id`  VARCHAR(50)     NOT NULL,
+    `action`        ENUM('Added','Edited') NOT NULL,
+    `changed_field` VARCHAR(80)     DEFAULT NULL,
+    -- For "Added": changed_field is NULL, new_value holds a JSON snapshot
+    -- For "Edited": changed_field is the field name, old_value/new_value are the values
+    `old_value`     TEXT            DEFAULT NULL,
+    `new_value`     TEXT            DEFAULT NULL,
+    `performed_at`  DATETIME        NOT NULL,
+    -- performed_at is stored in Asia/Manila (UTC+8) — set by PHP before INSERT
+    PRIMARY KEY (`id`),
+    INDEX `idx_eq_id`   (`equipment_id`),
+    INDEX `idx_perf_at` (`performed_at`)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: 127.0.0.1
+-- Generation Time: Apr 02, 2026 at 10:51 AM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.2.12
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Database: `labtracker`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `admin_credentials`
+--
+
+CREATE TABLE `admin_credentials` (
+  `id` int(11) NOT NULL,
+  `username` varchar(100) NOT NULL,
+  `password` varchar(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `admin_credentials`
+--
+
+INSERT INTO `admin_credentials` (`id`, `username`, `password`) VALUES
+(1, 'Admin', '$2y$10$2VvUGKT0pRc4tRLy7k6nRuMr0ALclsyyQZpKRlRRlvRQezPcgxYvG');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `borrowed_equipment`
+--
+
+CREATE TABLE `borrowed_equipment` (
+  `id` int(11) NOT NULL,
+  `borrow_request_id` int(11) NOT NULL,
+  `equipment_id` varchar(50) DEFAULT NULL,
+  `equipment_name` varchar(255) NOT NULL,
+  `quantity` int(11) NOT NULL DEFAULT 1,
+  `available` varchar(10) DEFAULT 'YES',
+  `returned_on` date DEFAULT NULL,
+  `remarks` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `borrowed_equipment`
+--
+
+INSERT INTO `borrowed_equipment` (`id`, `borrow_request_id`, `equipment_id`, `equipment_name`, `quantity`, `available`, `returned_on`, `remarks`) VALUES
+(1, 1, NULL, 'Micrometer', 1, '0', '2026-03-29', 'Basag boss');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `borrow_requests`
+--
+
+CREATE TABLE `borrow_requests` (
+  `id` int(11) NOT NULL,
+  `guest_number` varchar(20) NOT NULL,
+  `date` date DEFAULT NULL,
+  `borrower_name` varchar(255) NOT NULL,
+  `instructor_name` varchar(255) DEFAULT NULL,
+  `student_id` varchar(50) DEFAULT NULL,
+  `subject_code` varchar(50) DEFAULT NULL,
+  `usage_date` date DEFAULT NULL,
+  `room` varchar(100) DEFAULT NULL,
+  `status` enum('Pending','Accepted','Rejected') NOT NULL DEFAULT 'Pending',
+  `processed` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `borrow_requests`
+--
+
+INSERT INTO `borrow_requests` (`id`, `guest_number`, `date`, `borrower_name`, `instructor_name`, `student_id`, `subject_code`, `usage_date`, `room`, `status`, `processed`, `created_at`) VALUES
+(1, '0326009', '2026-03-29', 'Abarro, Kyrie E.', 'Mr. Ricardo Milos', '123123', '123', '2026-03-29', 'Room 407', 'Accepted', 0, '2026-03-29 07:30:15');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `equipment`
+--
+
+CREATE TABLE `equipment` (
+  `id` int(11) NOT NULL,
+  `equipment_id` varchar(50) NOT NULL,
+  `equipment_name` varchar(255) NOT NULL,
+  `serial_number` varchar(100) DEFAULT NULL,
+  `internal_sn` varchar(100) DEFAULT NULL,
+  `account_person` varchar(255) DEFAULT NULL,
+  `total_qty` int(11) NOT NULL DEFAULT 0,
+  `working_qty` int(11) NOT NULL DEFAULT 0,
+  `not_working_qty` int(11) NOT NULL DEFAULT 0,
+  `available` int(11) NOT NULL DEFAULT 0,
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `equipment`
+--
+
+INSERT INTO `equipment` (`id`, `equipment_id`, `equipment_name`, `serial_number`, `internal_sn`, `account_person`, `total_qty`, `working_qty`, `not_working_qty`, `available`, `description`, `created_at`) VALUES
+(1, 'E-001', 'Oscilloscope', 'SN-OSC-001', 'ISN-001', 'Juan Dela Cruz', 3, 3, 0, 3, 'Digital oscilloscope 100MHz', '2026-03-20 20:27:37'),
+(2, 'E-002', 'Function Generator', 'SN-FG-002', 'ISN-002', 'Juan Dela Cruz', 2, 1, 1, 1, 'Signal generator 0-20MHz', '2026-03-20 20:27:37'),
+(3, 'M-001', 'Vernier Caliper', 'SN-VC-001', 'ISN-003', 'Maria Santos', 5, 5, 0, 5, 'Stainless steel 150mm', '2026-03-20 20:27:37'),
+(4, 'M-002', 'Micrometer', 'SN-MIC-001', 'ISN-004', 'Maria Santos', 4, 4, 0, 4, 'Outside micrometer 0-25mm', '2026-03-20 20:27:37'),
+(5, 'C-001', 'Hydrochloric Acid', NULL, NULL, 'Dr. Reyes', 10, 10, 0, 10, '1M solution, 500ml bottles', '2026-03-20 20:27:37'),
+(6, 'B-001', 'Physics Lab Manual', NULL, NULL, 'Dr. Reyes', 20, 20, 0, 20, 'EARIST Applied Physics Lab Manual 2023', '2026-03-20 20:27:37');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `guests`
+--
+
+CREATE TABLE `guests` (
+  `id` int(11) NOT NULL,
+  `guest_number` varchar(20) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `guests`
+--
+
+INSERT INTO `guests` (`id`, `guest_number`, `created_at`) VALUES
+(1, '0326001', '2026-03-20 20:31:09'),
+(2, '0326002', '2026-03-24 17:34:09'),
+(3, '0326003', '2026-03-24 17:36:49'),
+(4, '0326004', '2026-03-24 17:42:34'),
+(5, '0326005', '2026-03-24 17:47:05'),
+(6, '0326006', '2026-03-24 17:52:04'),
+(7, '0326007', '2026-03-24 17:53:20'),
+(8, '0326008', '2026-03-24 19:01:12'),
+(9, '0326009', '2026-03-29 07:26:02'),
+(10, '0326010', '2026-03-29 07:34:03'),
+(11, '0326011', '2026-03-29 07:36:15'),
+(12, '0326012', '2026-03-29 07:41:39');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `instructors`
+--
+
+CREATE TABLE `instructors` (
+  `id` int(11) NOT NULL,
+  `instructor_name` varchar(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `instructors`
+--
+
+INSERT INTO `instructors` (`id`, `instructor_name`) VALUES
+(1, 'Prof. Hiromi Rivas'),
+(2, 'Prof. Lester Bernardino'),
+(3, 'Mr. Ricardo Milos'),
+(4, 'Dr. Raymund Bolalin');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rooms`
+--
+
+CREATE TABLE `rooms` (
+  `id` int(11) NOT NULL,
+  `room_number` varchar(50) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `rooms`
+--
+
+INSERT INTO `rooms` (`id`, `room_number`) VALUES
+(1, 'Room 407');
+
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table `admin_credentials`
+--
+ALTER TABLE `admin_credentials`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `username` (`username`);
+
+--
+-- Indexes for table `borrowed_equipment`
+--
+ALTER TABLE `borrowed_equipment`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_borrow_request_id` (`borrow_request_id`),
+  ADD KEY `idx_equipment_name` (`equipment_name`);
+
+--
+-- Indexes for table `borrow_requests`
+--
+ALTER TABLE `borrow_requests`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_status` (`status`),
+  ADD KEY `idx_usage_date` (`usage_date`),
+  ADD KEY `idx_created_at` (`created_at`),
+  ADD KEY `idx_guest_number` (`guest_number`);
+
+--
+-- Indexes for table `equipment`
+--
+ALTER TABLE `equipment`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `equipment_id` (`equipment_id`),
+  ADD KEY `idx_equipment_id` (`equipment_id`),
+  ADD KEY `idx_equipment_name` (`equipment_name`);
+
+--
+-- Indexes for table `guests`
+--
+ALTER TABLE `guests`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `guest_number` (`guest_number`),
+  ADD KEY `idx_guest_number` (`guest_number`);
+
+--
+-- Indexes for table `instructors`
+--
+ALTER TABLE `instructors`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `rooms`
+--
+ALTER TABLE `rooms`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `admin_credentials`
+--
+ALTER TABLE `admin_credentials`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `borrowed_equipment`
+--
+ALTER TABLE `borrowed_equipment`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `borrow_requests`
+--
+ALTER TABLE `borrow_requests`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `equipment`
+--
+ALTER TABLE `equipment`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `guests`
+--
+ALTER TABLE `guests`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+--
+-- AUTO_INCREMENT for table `instructors`
+--
+ALTER TABLE `instructors`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `rooms`
+--
+ALTER TABLE `rooms`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `borrowed_equipment`
+--
+ALTER TABLE `borrowed_equipment`
+  ADD CONSTRAINT `fk_borrowed_request` FOREIGN KEY (`borrow_request_id`) REFERENCES `borrow_requests` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+-- ========================================
+-- INVENTORY AUDIT TABLES
+-- ========================================
+
+-- Main audit records
+CREATE TABLE IF NOT EXISTS inventory_audits (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  audit_date DATE NOT NULL,
+  admin_name VARCHAR(100) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'Draft',
+  total_items INT DEFAULT 0,
+  complete_count INT DEFAULT 0,
+  missing_count INT DEFAULT 0,
+  damaged_count INT DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  submitted_at DATETIME NULL,
+  notes TEXT NULL,
+  KEY idx_status (status),
+  KEY idx_audit_date (audit_date),
+  KEY idx_admin_name (admin_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Individual audit items (one audit can have many items)
+CREATE TABLE IF NOT EXISTS audit_items (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  audit_id INT NOT NULL,
+  equipment_id VARCHAR(100) NOT NULL,
+  equipment_name VARCHAR(255) NOT NULL,
+  expected_qty INT NOT NULL,
+  actual_qty INT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'Complete',
+  damage_notes VARCHAR(500) NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_audit_id (audit_id),
+  KEY idx_equipment_id (equipment_id),
+  KEY idx_status (status),
+  CONSTRAINT fk_audit_items_audit FOREIGN KEY (audit_id) REFERENCES inventory_audits(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
